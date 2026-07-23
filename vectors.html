@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vectors: Tip to Tail (MCV4U)</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1c2733;background:#eef1f5}
+  #app{height:100%;display:flex;flex-direction:column}
+
+  header{display:flex;justify-content:space-between;align-items:baseline;padding:10px 18px 4px;gap:12px}
+  h1{font-size:19px;margin:0;font-weight:700}
+  #ptitle{font-weight:400;color:#4a5563}
+  #pageind{color:#8a94a1;font-size:14px;white-space:nowrap}
+  .hint{padding:0 18px 6px;color:#5b6672;font-size:14.5px}
+
+  main{flex:1;min-height:0;position:relative;display:flex;justify-content:center;align-items:center;padding:0 12px}
+  svg#board{max-width:100%;max-height:100%;background:#fff;border:1px solid #d7dde5;border-radius:6px;
+            touch-action:none;user-select:none;-webkit-user-select:none}
+
+  #readout{position:absolute;top:10px;left:24px;background:rgba(255,255,255,.94);border:1px solid #d7dde5;
+           border-radius:8px;padding:7px 14px;font-size:15px;line-height:1.9;pointer-events:none}
+  #readout.big{font-size:22px;line-height:2;padding:10px 18px}
+  #readout .num{font-variant-numeric:tabular-nums;font-weight:600}
+
+  footer{display:flex;align-items:center;gap:10px;padding:10px 18px 14px}
+  button{font:inherit;min-height:46px;padding:8px 18px;border-radius:10px;border:1.5px solid #c3cad3;
+         background:#f6f8fa;cursor:pointer;font-size:16px;touch-action:manipulation;color:#1c2733}
+  button:hover{background:#eceff3}
+  button.on{background:#dbeafe;border-color:#1d6ee0;color:#1d6ee0;font-weight:600}
+  button:disabled{opacity:.45;cursor:default}
+  #next{background:#1d6ee0;border-color:#1d6ee0;color:#fff;font-size:20px;font-weight:650;padding:12px 36px}
+  #next:hover{background:#1a63c9}
+  #back{min-height:40px;font-size:14px;padding:6px 14px;color:#4a5563}
+  .tools{flex:1;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap}
+  .tools label{font-size:15px;color:#4a5563}
+  input#labIn{font:inherit;font-size:18px;width:64px;min-height:44px;padding:4px 8px;border:1.5px solid #c3cad3;
+              border-radius:8px;text-align:center;font-style:italic;font-weight:700}
+
+  /* vector letter with a small arrow drawn above it */
+  .vc{font-style:italic;font-weight:700;position:relative;display:inline-block}
+  .vc::before{content:"→";position:absolute;left:50%;transform:translateX(-50%);top:-0.72em;
+              font-size:0.58em;font-style:normal;font-weight:600}
+
+  /* SVG text */
+  .vlab{font:italic 700 27px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-anchor:middle;
+        paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round}
+  .mlab{font:700 20px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-anchor:middle;
+        paint-order:stroke;stroke:#fff;stroke-width:4px}
+  circle.hnd{fill:#fff;stroke-width:3;r:8px}
+  circle.hnd:hover{r:11px}
+
+  /* quiz page */
+  main.quiz{display:block;overflow:auto;padding:12px 18px}
+  .qwrap{max-width:860px;margin:0 auto}
+  .props{background:#fff;border:1px solid #d7dde5;border-radius:10px;padding:14px 22px;margin-bottom:16px}
+  .props h2{font-size:16px;margin:0 0 6px;color:#4a5563;font-weight:600}
+  .props .row{font-size:22px;line-height:2.15}
+  .qcard{background:#fff;border:1px solid #d7dde5;border-radius:10px;padding:14px 18px;margin-bottom:12px}
+  .qtext{font-size:17px;line-height:2;margin:2px 0 10px}
+  .qnum{font-weight:700;margin-right:6px}
+  select{font:inherit;font-size:16px;min-height:44px;padding:6px 10px;border-radius:8px;border:1.5px solid #c3cad3;background:#fff}
+  .fb{margin-top:10px;font-size:15.5px;border-radius:8px;padding:9px 13px;display:none;line-height:1.5}
+  .fb.ok{display:block;background:#e7f6ec;color:#116330;border:1px solid #a9dcb9}
+  .fb.no{display:block;background:#fdf3e3;color:#7a5410;border:1px solid #edd39a}
+  .paper{color:#8a94a1;font-size:13.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+
+/* ---------- constants ---------- */
+const S = 60, COLS = 16, ROWS = 12, W = COLS*S, H = ROWS*S;
+const COL   = {a:"#1d6ee0", b:"#e8820c", c:"#1d9a3f", u:"#8b2fc9", v:"#0e9a8f", res:"#d81b2f"};
+const LIGHT = {a:"#8ab7f2", b:"#f3c08a", c:"#8fd3a4", u:"#c9a1e8", v:"#82ccc6"};
+const R_TIP = 0.34, R_BODY = 0.33;           // hit radii in grid units
+
+const PDEFS = [
+  {title:"two vectors",
+   hint:"Place the arrows tip to tail, then use <b>Draw arrow</b> to draw the resultant yourself.",
+   vecs:[["a",2,7,4,2],["b",10,8,3,-2]]},
+  {title:"two vectors, new set",
+   hint:"Same experiment, brand-new vectors.",
+   vecs:[["a",12,3,-3,2],["b",3,9,4,-1]]},
+  {title:"three vectors, third set",
+   hint:"A third set, with room to use all three.",
+   vecs:[["a",2,9,3,1],["b",13,10,2,-3],["c",12,3,-4,2]]},
+  {title:"the opposite vector",
+   hint:"Vector <span class='vc' style='color:#1d6ee0'>a</span> is alone. Press the button when you are ready.",
+   vecs:[["a",5,4,4,3]], minus:true},
+  {title:"how long can a resultant get?",
+   hint:"<span class='vc' style='color:#e8820c'>b</span>&rsquo;s tail is locked to <span class='vc' style='color:#1d6ee0'>a</span>&rsquo;s tip. Drag and turn the arrows and watch the numbers.",
+   vecs:[["a",4,5,4,3]], p5:true},
+  {title:"build it yourself",
+   hint:"Empty grid. Type a label, then draw each arrow with two taps: start point, then end point.",
+   vecs:[], blank:true},
+  {title:"properties and practice", quiz:true},
+];
+
+const DRAG_HINT = " &nbsp;&middot;&nbsp; Drag an arrow&rsquo;s <b>body</b> to move it, the <b>dot at its tip</b> to change it.";
+
+/* ---------- state ---------- */
+let cur = 0;
+const states = {};
+
+function initState(i){
+  const def = PDEFS[i];
+  if (def.quiz) return {};
+  const st = {
+    vecs: def.vecs.map(v => ({label:v[0], color:COL[v[0]], tail:{x:v[1], y:v[2]}, comp:{x:v[3], y:v[4]}})),
+    drawn: [], drawMode:false, drawStart:null, drawCur:null, minusAdded:false
+  };
+  if (def.p5) st.b = {x:3, y:0};
+  return st;
+}
+function getState(){ return states[cur] || (states[cur] = initState(cur)); }
+
+/* ---------- small helpers ---------- */
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+const add = (p,q) => ({x:p.x+q.x, y:p.y+q.y});
+const sub = (p,q) => ({x:p.x-q.x, y:p.y-q.y});
+const mag = c => Math.hypot(c.x, c.y);
+const toScr = p => [p.x*S, (ROWS-p.y)*S];
+const snapClamp = g => ({x:clamp(Math.round(g.x),0,COLS), y:clamp(Math.round(g.y),0,ROWS)});
+const samePt = (p,q) => p.x===q.x && p.y===q.y;
+
+function clampTail(t, c){
+  return {x:clamp(t.x, Math.max(0,-c.x), Math.min(COLS, COLS-c.x)),
+          y:clamp(t.y, Math.max(0,-c.y), Math.min(ROWS, ROWS-c.y))};
+}
+function dSeg(p,a,b){
+  const abx=b.x-a.x, aby=b.y-a.y, L2=abx*abx+aby*aby;
+  let t = L2 ? ((p.x-a.x)*abx + (p.y-a.y)*aby)/L2 : 0;
+  t = clamp(t,0,1);
+  return Math.hypot(p.x-(a.x+t*abx), p.y-(a.y+t*aby));
+}
+function V(l){ return `<span class="vc"${COL[l]?` style="color:${COL[l]}"`:""}>${l}</span>`; }
+
+/* colour for a student-drawn arrow on the blank page, based on its typed label */
+function drawnColor(label){
+  const neg = label.startsWith("-") || label.startsWith("−");
+  const base = (neg ? label.slice(1) : label).toLowerCase();
+  if (COL[base]) return neg ? LIGHT[base] : COL[base];
+  return COL.res;
+}
+
+/* ---------- SVG builders ---------- */
+function gridBg(){
+  let s = `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/>`;
+  for (let i=0;i<=COLS;i++) s += `<line x1="${i*S}" y1="0" x2="${i*S}" y2="${H}" stroke="#dfe5ec" stroke-width="1"/>`;
+  for (let j=0;j<=ROWS;j++) s += `<line x1="0" y1="${j*S}" x2="${W}" y2="${j*S}" stroke="#dfe5ec" stroke-width="1"/>`;
+  s += `<line x1="${8*S}" y1="0" x2="${8*S}" y2="${H}" stroke="#aab3bf" stroke-width="2.5"/>`;
+  s += `<line x1="0" y1="${6*S}" x2="${W}" y2="${6*S}" stroke="#aab3bf" stroke-width="2.5"/>`;
+  return s;
+}
+
+function arrowStr(tail, comp, color, width, opts){
+  opts = opts || {};
+  const [tx,ty] = toScr(tail), [px,py] = toScr(add(tail,comp));
+  const len = Math.hypot(px-tx, py-ty);
+  if (len < 1) return "";
+  const ux=(px-tx)/len, uy=(py-ty)/len, nx=-uy, ny=ux;
+  const hl = width>=9 ? 30 : 24, hw = width>=9 ? 13 : 10.5;
+  const ex = px-ux*(hl-2), ey = py-uy*(hl-2);
+  const bx = px-ux*hl, by = py-uy*hl;
+  let s = `<line x1="${tx}" y1="${ty}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"${opts.dash?` stroke-dasharray="10 8"`:""}/>`;
+  s += `<polygon points="${px},${py} ${bx+nx*hw},${by+ny*hw} ${bx-nx*hw},${by-ny*hw}" fill="${color}"/>`;
+  // label sits at the midpoint, offset to the upper side, far from the arrowhead
+  const mx=(tx+px)/2, my=(ty+py)/2;
+  const side = ny<0 ? 1 : -1;
+  const lx = mx + nx*26*side, ly = my + ny*26*side + 8;
+  if (opts.label){
+    const off = opts.label.length>1 ? 7 : 0;
+    s += `<text x="${lx}" y="${ly}" class="vlab" fill="${color}">${opts.label}</text>`;
+    s += `<path d="M ${lx+off-8} ${ly-25} h 15 l -5 -4 m 5 4 l -5 4" stroke="${color}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  if (opts.magLabel){
+    const gx = opts.label ? mx - nx*24*side : lx;
+    const gy = opts.label ? my - ny*24*side + 7 : ly;
+    s += `<text x="${gx}" y="${gy}" class="mlab" fill="${color}">${opts.magLabel}</text>`;
+  }
+  return s;
+}
+
+function handleStr(tail, comp, color){
+  const [px,py] = toScr(add(tail,comp));
+  return `<circle class="hnd" cx="${px}" cy="${py}" r="8" stroke="${color}"/>`;
+}
+
+/* ---------- page rendering ---------- */
+const app = document.getElementById("app");
+let board = null, drag = null;
+
+function renderPage(){
+  const def = PDEFS[cur];
+  drag = null;
+  if (def.quiz){ renderQuiz(def); return; }
+  const st = getState();
+
+  app.innerHTML = `
+    <header>
+      <h1>Vectors: tip to tail <span id="ptitle">&middot; ${def.title}</span></h1>
+      <div id="pageind">Page ${cur+1} of 7</div>
+    </header>
+    <div class="hint">${def.hint}${DRAG_HINT}</div>
+    <main>
+      <svg id="board" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="readout"${def.p5?' class="big"':''}${def.blank?' style="display:none"':''}></div>
+    </main>
+    <footer>
+      <button id="back"${cur===0?' style="visibility:hidden"':''}>&larr; Back</button>
+      <div class="tools" id="tools"></div>
+      <button id="next">Next &rarr;</button>
+    </footer>`;
+
+  const tools = document.getElementById("tools");
+  if (!def.p5){
+    let t = "";
+    if (def.blank) t += `<label for="labIn">Label:</label><input id="labIn" maxlength="3" placeholder="u" autocomplete="off">`;
+    t += `<button id="drawBtn"${st.drawMode?' class="on"':''}>&#9998; Draw arrow</button>`;
+    t += `<button id="clearBtn">Clear drawn</button>`;
+    if (def.minus) t += `<button id="minusBtn"${st.minusAdded?" disabled":""}>Add &minus;<i>a</i></button>`;
+    t += `<button id="resetBtn">Reset</button>`;
+    tools.innerHTML = t;
+  } else {
+    tools.innerHTML = `<button id="resetBtn">Reset</button>`;
+  }
+
+  document.getElementById("next").onclick = () => { if (cur<6){ cur++; renderPage(); } };
+  const back = document.getElementById("back");
+  if (back) back.onclick = () => { if (cur>0){ cur--; renderPage(); } };
+  document.getElementById("resetBtn").onclick = () => { states[cur] = initState(cur); renderPage(); };
+
+  const drawBtn = document.getElementById("drawBtn");
+  if (drawBtn) drawBtn.onclick = () => {
+    st.drawMode = !st.drawMode; st.drawStart = null;
+    drawBtn.classList.toggle("on", st.drawMode);
+    refresh();
+  };
+  const clearBtn = document.getElementById("clearBtn");
+  if (clearBtn) clearBtn.onclick = () => { st.drawn = []; st.drawStart = null; refresh(); };
+  const minusBtn = document.getElementById("minusBtn");
+  if (minusBtn) minusBtn.onclick = () => {
+    const a = st.vecs[0];
+    const c = {x:-a.comp.x, y:-a.comp.y};
+    st.vecs.push({label:"−a", color:LIGHT.a, tail:clampTail({x:11,y:9}, c), comp:c});
+    st.minusAdded = true;
+    minusBtn.disabled = true;
+    refresh();
+  };
+
+  board = document.getElementById("board");
+  board.addEventListener("pointerdown", onDown);
+  board.addEventListener("pointermove", onMove);
+  board.addEventListener("pointerup", onUp);
+  board.addEventListener("pointercancel", () => { drag = null; });
+  refresh();
+}
+
+/* everything the student can grab, as {t:'v'|'d'|'b', i, tail, comp} */
+function interactives(){
+  const def = PDEFS[cur], st = getState(), arr = [];
+  st.vecs.forEach((v,i) => arr.push({t:"v", i, tail:v.tail, comp:v.comp}));
+  if (def.p5){
+    const a = st.vecs[0];
+    arr.push({t:"b", tail:add(a.tail, a.comp), comp:st.b});
+  }
+  st.drawn.forEach((v,i) => arr.push({t:"d", i, tail:v.tail, comp:v.comp}));
+  return arr;
+}
+
+function hitTest(g){
+  const items = interactives();
+  let best = null, bd = R_TIP;
+  for (const it of items){
+    const d = Math.hypot(g.x-(it.tail.x+it.comp.x), g.y-(it.tail.y+it.comp.y));
+    if (d < bd){ bd = d; best = {ref:it, mode:"tip"}; }
+  }
+  if (best) return best;
+  bd = R_BODY;
+  for (const it of items){
+    const d = dSeg(g, it.tail, add(it.tail, it.comp));
+    if (d < bd){ bd = d; best = {ref:it, mode:"body"}; }
+  }
+  return best;
+}
+
+function toGrid(e){
+  const pt = board.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(board.getScreenCTM().inverse());
+  return {x:p.x/S, y:ROWS - p.y/S};
+}
+
+function onDown(e){
+  e.preventDefault();
+  const st = getState(), g = toGrid(e);
+  board.setPointerCapture(e.pointerId);
+  if (st.drawMode){
+    if (!st.drawStart){ st.drawStart = snapClamp(g); st.drawCur = snapClamp(g); refresh(); }
+    return;
+  }
+  const hit = hitTest(g);
+  if (hit){
+    drag = {ref:hit.ref, mode:hit.mode,
+            offX:g.x-hit.ref.tail.x, offY:g.y-hit.ref.tail.y,
+            g0:g, comp0:{x:hit.ref.comp.x, y:hit.ref.comp.y}};
+  }
+}
+
+function onMove(e){
+  const st = getState(), g = toGrid(e);
+  if (st.drawMode){
+    if (st.drawStart){ st.drawCur = snapClamp(g); refresh(); }
+    board.style.cursor = "crosshair";
+    return;
+  }
+  if (drag){ applyDrag(g); refresh(); return; }
+  const hit = hitTest(g);
+  board.style.cursor = hit ? (hit.mode==="tip" ? "pointer" : "grab") : "default";
+}
+
+function onUp(e){
+  const st = getState();
+  if (st.drawMode && st.drawStart){
+    const end = snapClamp(toGrid(e));
+    if (!samePt(end, st.drawStart)){
+      const def = PDEFS[cur];
+      const label = def.blank ? (document.getElementById("labIn").value.trim()) : "";
+      st.drawn.push({tail:st.drawStart, comp:sub(end, st.drawStart),
+                     label, color: def.blank ? drawnColor(label) : COL.res});
+      st.drawStart = null;
+      refresh();
+    }
+    return;
+  }
+  drag = null;
+}
+
+function applyDrag(g){
+  const st = getState(), r = drag.ref;
+  if (r.t === "b"){                       // page 5: b, tail locked to a's tip
+    const a = st.vecs[0], bt = add(a.tail, a.comp);
+    let nc;
+    if (drag.mode === "tip"){
+      nc = sub(snapClamp(g), bt);
+    } else {
+      nc = {x:drag.comp0.x + Math.round(g.x-drag.g0.x),
+            y:drag.comp0.y + Math.round(g.y-drag.g0.y)};
+      nc.x = clamp(nc.x, -bt.x, COLS-bt.x);
+      nc.y = clamp(nc.y, -bt.y, ROWS-bt.y);
+    }
+    if (nc.x || nc.y) st.b = nc;
+    return;
+  }
+  const v = (r.t === "v") ? st.vecs[r.i] : st.drawn[r.i];
+  if (drag.mode === "tip"){
+    const nc = sub(snapClamp(g), v.tail);
+    if (nc.x || nc.y) v.comp = nc;
+  } else {
+    v.tail = clampTail(snapClamp({x:g.x-drag.offX, y:g.y-drag.offY}), v.comp);
+  }
+  r.tail = v.tail; r.comp = v.comp;
+}
+
+/* ---------- refresh: redraw SVG + readout ---------- */
+function refresh(){
+  const def = PDEFS[cur], st = getState();
+  let s = gridBg();
+  let handles = "";
+
+  if (def.p5){
+    const a = st.vecs[0], bt = add(a.tail, a.comp);
+    s += arrowStr(a.tail, add(a.comp, st.b), COL.res, 10, {label:"a+b"});
+    s += arrowStr(a.tail, a.comp, a.color, 7, {label:"a"});
+    s += arrowStr(bt, st.b, COL.b, 7, {label:"b"});
+    handles += handleStr(a.tail, a.comp, a.color) + handleStr(bt, st.b, COL.b);
+  } else {
+    for (const d of st.drawn){
+      const w = d.label ? 7 : 9;
+      s += arrowStr(d.tail, d.comp, d.color, w,
+                    {label:d.label, magLabel: def.blank ? "" : mag(d.comp).toFixed(1)});
+      handles += handleStr(d.tail, d.comp, d.color);
+    }
+    for (const v of st.vecs){
+      s += arrowStr(v.tail, v.comp, v.color, 7, {label:v.label});
+      handles += handleStr(v.tail, v.comp, v.color);
+    }
+    if (st.drawMode && st.drawStart){
+      const [sx,sy] = toScr(st.drawStart);
+      s += `<circle cx="${sx}" cy="${sy}" r="7" fill="${COL.res}"/>`;
+      if (!samePt(st.drawStart, st.drawCur))
+        s += arrowStr(st.drawStart, sub(st.drawCur, st.drawStart), COL.res, 6, {dash:true});
+    }
+  }
+  board.innerHTML = s + handles;
+
+  const ro = document.getElementById("readout");
+  if (!ro || def.blank) return;
+  if (def.p5){
+    const a = st.vecs[0];
+    const ma = mag(a.comp), mb = mag(st.b), mr = mag(add(a.comp, st.b));
+    const row = (l,v) => `<div>${l} <span class="num">= ${v.toFixed(1)}</span></div>`;
+    ro.innerHTML =
+      row(`|${V("a")}|`, ma) +
+      row(`|${V("b")}|`, mb) +
+      row(`|${V("a")}| + |${V("b")}|`, ma+mb) +
+      row(`|${V("a")} + ${V("b")}|`, mr);
+  } else {
+    ro.innerHTML = st.vecs.map(v =>
+      `<div><span class="vc" style="color:${v.color}">${v.label}</span>` +
+      ` = (${v.comp.x}, ${v.comp.y}), &nbsp;|<span class="vc" style="color:${v.color}">${v.label}</span>|` +
+      ` = <span class="num">${mag(v.comp).toFixed(1)}</span></div>`).join("");
+  }
+}
+
+/* ---------- page 7: properties and practice ---------- */
+const OPTS = ["a property", "triangle law with Pythagoras", "cosine and sine law"];
+const QS = [
+  {text:`Fill in the blank: &nbsp; (a) ${V("u")} + ${V("w")} = ___ &nbsp; (b) ${V("u")} + (−${V("u")}) = ___ &nbsp; (c) (${V("u")} + ${V("w")}) + ${V("z")} = ___`,
+   correct:0, nudge:["", "Not quite. Is there anything here to calculate?", "Not quite. Is there anything here to calculate?"]},
+  {text:`A cyclist rides 12&nbsp;km East, then 5&nbsp;km North. How far from the start, and what bearing?`,
+   correct:1, nudge:["There are numbers to work out here. Sketch the two rides tip to tail. What shape do they make?", "",
+                     "That could work, but what is special about the angle between East and North?"]},
+  {text:`Two vectors of length 5 and 8 have a 60&deg; angle between them. Find the length of their sum and the angle it makes with the length-8 vector.`,
+   correct:2, nudge:["There are lengths and angles to work out here. Sketch the triangle first.",
+                     "Careful: is there a right angle anywhere in this triangle?", ""]},
+  {text:`${V("u")} and ${V("v")} start at the same point. How do you draw ${V("u")} − ${V("v")}?`,
+   correct:1, nudge:["Not quite. This one asks you to build a picture. What does adding −" + V("v") + " look like?", "",
+                     "No lengths or angles are given; this is about how to draw it."]},
+  {text:`True or false, and why: for any two vectors, |${V("a")} + ${V("b")}| = |${V("a")}| + |${V("b")}|.`,
+   correct:0, nudge:["", "Not quite. Is there anything here to calculate? Think back to page 5.",
+                     "Not quite. Is there anything here to calculate? Think back to page 5."]},
+];
+
+function renderQuiz(def){
+  const props = [
+    `${V("a")} + ${V("b")} = ${V("b")} + ${V("a")}`,
+    `(${V("a")} + ${V("b")}) + ${V("c")} = ${V("a")} + (${V("b")} + ${V("c")})`,
+    `${V("a")} + ${V("0")} = ${V("a")}`,
+    `${V("a")} + (−${V("a")}) = ${V("0")}`,
+  ];
+  app.innerHTML = `
+    <header>
+      <h1>Vectors: tip to tail <span id="ptitle">&middot; ${def.title}</span></h1>
+      <div id="pageind">Page 7 of 7</div>
+    </header>
+    <main class="quiz">
+      <div class="qwrap">
+        <div class="props">
+          <h2>Properties of vector addition (copy these into your notes)</h2>
+          ${props.map(p => `<div class="row">${p}</div>`).join("")}
+        </div>
+        ${QS.map((q,i) => `
+          <div class="qcard">
+            <div class="qtext"><span class="qnum">${i+1}.</span>${q.text}</div>
+            <label>Which tool does this question need?&nbsp;
+              <select data-q="${i}">
+                <option value="">Choose the tool&hellip;</option>
+                ${OPTS.map((o,j) => `<option value="${j}">${o}</option>`).join("")}
+              </select>
+            </label>
+            <div class="fb" id="fb${i}"></div>
+            <div class="paper">Work out your answer on paper.</div>
+          </div>`).join("")}
+      </div>
+    </main>
+    <footer>
+      <button id="back">&larr; Back</button>
+      <div class="tools"><span style="color:#8a94a1">Answers: your teacher has them.</span></div>
+    </footer>`;
+
+  document.getElementById("back").onclick = () => { cur--; renderPage(); };
+  app.querySelectorAll("select[data-q]").forEach(sel => {
+    sel.onchange = () => {
+      const i = +sel.dataset.q, fb = document.getElementById("fb"+i);
+      if (sel.value === ""){ fb.className = "fb"; fb.innerHTML = ""; return; }
+      const pick = +sel.value;
+      if (pick === QS[i].correct){
+        fb.className = "fb ok"; fb.innerHTML = "&#10003; Right tool. Now work it out on paper.";
+      } else {
+        fb.className = "fb no"; fb.innerHTML = QS[i].nudge[pick];
+      }
+    };
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>
