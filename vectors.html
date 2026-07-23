@@ -58,6 +58,7 @@
   .props{background:#fff;border:1px solid #d7dde5;border-radius:10px;padding:14px 22px;margin-bottom:16px}
   .props h2{font-size:16px;margin:0 0 6px;color:#4a5563;font-weight:600}
   .props .row{font-size:22px;line-height:2.15}
+  .props .lawnote{font-size:14.5px;color:#5b6672;line-height:1.6;margin:-2px 0 8px}
   .qcard{background:#fff;border:1px solid #d7dde5;border-radius:10px;padding:14px 18px;margin-bottom:12px}
   .qtext{font-size:17px;line-height:2;margin:2px 0 10px}
   .qnum{font-weight:700;margin-right:6px}
@@ -454,6 +455,12 @@ function renderQuiz(def){
         <div class="props">
           <h2>Properties of vector addition (copy these into your notes)</h2>
           ${props.map(p => `<div class="row">${p}</div>`).join("")}
+        </div>
+        <div class="props">
+          <h2>Cosine and sine law (for reference)</h2>
+          <div class="row">Cosine law: &nbsp;<i>r</i><sup>2</sup> = <i>p</i><sup>2</sup> + <i>q</i><sup>2</sup> &minus; 2<i>pq</i>&thinsp;cos&thinsp;<i>C</i></div>
+          <div class="lawnote"><i>C</i> is the angle between sides <i>p</i> and <i>q</i>; <i>r</i> is the side across from it.</div>
+          <div class="row">Sine law: &nbsp;(sin&thinsp;<i>A</i>)&thinsp;/&thinsp;<i>a</i> = (sin&thinsp;<i>B</i>)&thinsp;/&thinsp;<i>b</i> = (sin&thinsp;<i>C</i>)&thinsp;/&thinsp;<i>c</i></div>
         </div>
         ${QS.map((q,i) => `
           <div class="qcard">
